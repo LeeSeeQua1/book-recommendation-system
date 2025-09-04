@@ -33,25 +33,30 @@ async def get_title(possible_titles: list[str],
 
 async def get_recommendations(update: Update, book_title: str) -> None:
     ans = recommend(book_title)
+    print("Generating recommendation for", book_title)
+    print("Recommended books are", ans)
     if ans is None:
         message = "Couldn't generate recommendations for your book"
         await update.message.reply_text(message)
     else:
         message = "I suggest you to read the following:\n"
-        for book, _ in ans:
+        # for book, _ in ans:
+        #     message += book + "\n"
+        for book in ans:
             message += book + "\n"
-        try:
-            media_group = []
-            for book, url in ans:
-                media_group.append(InputMediaPhoto(
-                    media=url,
-                    caption=book
-                ))
-            await update.message.reply_text(message)
-            await update.message.reply_media_group(media=media_group)
-        except Exception as e:
-            print("Error while sending images:", e)
-            await update.message.reply_text("Couldn't load book covers")
+        await update.message.reply_text(message)
+        # try:
+        #     media_group = []
+        #     for book, url in ans:
+        #         media_group.append(InputMediaPhoto(
+        #             media=url,
+        #             caption=book
+        #         ))
+        #     await update.message.reply_text(message)
+        #     await update.message.reply_media_group(media=media_group)
+        # except Exception as e:
+        #     print("Error while sending images:", e)
+        #     await update.message.reply_text("Couldn't load book covers")
 
 
 async def choose_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
