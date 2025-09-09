@@ -18,57 +18,61 @@ def normalize(text: str) -> str:
     return text.lower()
 
 
-def get_matching_titles(book_title: str) -> list[str]:
-    title_words = list(map(normalize, book_title.split()))
-    return (top_books[top_books.to_series()
-            .apply(lambda x: all(s in normalize(str(x)).split() for s in title_words))]
-            .to_list())
+class CFModel:
 
+    # TODO shouldn't init return object created
+    def __init__(self, books_dataset: pd.DataFrame, users_dataset: pd.DataFrame):
+        self.top_books = None
+        self.book_user_table = None
+        self.pairwise_sim = None
+        self.books = books_dataset
+        self.users = users_dataset
 
-def recommend(book_title: str, k: int = 5) -> list[str]:
-    indices = np.where(book_user_table.index == book_title)
-    if len(indices) == 0 or indices[0].size == 0:
-        print("Unknown book")
-        return []
-    idx = indices[0][0]
+        self.books.dropna(inplace=True) #TODO will this change the original dataset? Probably will
+        self.books.drop(columns=['Image-URL-S', 'Image-URL-L'], inplace=True)
+        self.books = self.books[self.books['Book-Title'].apply(is_good_title)]
 
-    enum_sim = list(enumerate(pairwise_sim[idx]))
-    sorted_sim = list(sorted(enum_sim, key=lambda x: x[1], reverse=True))
-    neighbors = list(map(lambda x: x[0], sorted_sim[1:k + 1]))
-    similarities = list(map(lambda x: x[1], sorted_sim[1:k + 1]))
-    ans = book_user_table.index[neighbors]
-    return list(zip(ans.to_list(), similarities))
+    def fit(self, ratings: pd.DataFrame,
+            min_book_reviews:int = 50,
+            min_user_ratings: int = 200):
 
+        new_ratings = ratings.merge(self.books, on='ISBN')
+        new_ratings.drop(columns=[
+            'Year-Of-Publication',
+            'Publisher',
+            'Image-URL-M',
+            'Book-Author'],
+            inplace=True)
+        user_ratings = ratings.groupby('User-ID').size()
+        book_ratings = new_ratings.groupby('Book-Title')['Book-Rating'].agg(
+            avg_rating='mean',
+            num_ratings='count'
+        )
 
-MIN_BOOK_REVIEWS = 25
-MIN_USER_RATINGS = 100
+        self.top_books = book_ratings[book_ratings['num_ratings'] > min_book_reviews].index
+        top_users = user_ratings[user_ratings > min_user_ratings].index
+        filtered_ratings = new_ratings[
+            new_ratings['Book-Title'].isin(self.top_books) & new_ratings['User-ID'].isin(top_users)]
+        self.book_user_table = filtered_ratings.pivot_table(index='Book-Title', columns='User-ID', values='Book-Rating')
+        self.book_user_table.fillna(0, inplace=True)
+        self.pairwise_sim = cosine_similarity(self.book_user_table)
 
-data_path = './data/'
-books = pd.read_csv(data_path + 'Books.csv')
-ratings = pd.read_csv(data_path + 'Ratings.csv')
-users = pd.read_csv(data_path + 'Users.csv')
+    def recommend(self, book_title: str, num_books: int = 5) -> list[str]:
+        indices = np.where(self.book_user_table.index == book_title)
+        if len(indices) == 0 or indices[0].size == 0:
+            print("Unknown book")
+            return []
+        idx = indices[0][0]
 
-books.dropna(inplace=True)
-books.drop(columns=['Image-URL-S', 'Image-URL-L'], inplace=True)
-books = books[books['Book-Title'].apply(is_good_title)]
+        enum_sim = list(enumerate(self.pairwise_sim[idx]))
+        sorted_sim = list(sorted(enum_sim, key=lambda x: x[1], reverse=True))
+        neighbors = list(map(lambda x: x[0], sorted_sim[1 : num_books + 1]))
+        similarities = list(map(lambda x: x[1], sorted_sim[1 : num_books + 1]))
+        ans = self.book_user_table.index[neighbors]
+        return list(zip(ans.to_list(), similarities))
 
-new_ratings = ratings.merge(books, on='ISBN')
-new_ratings.drop(columns=[
-    'Year-Of-Publication',
-    'Publisher',
-    'Image-URL-M',
-    'Book-Author'],
-    inplace=True)
-user_ratings = ratings.groupby('User-ID').size()
-book_ratings = new_ratings.groupby('Book-Title')['Book-Rating'].agg(
-    avg_rating='mean',
-    num_ratings='count'
-)
-
-top_books = book_ratings[book_ratings['num_ratings'] > MIN_BOOK_REVIEWS].index
-top_users = user_ratings[user_ratings > MIN_USER_RATINGS].index
-filtered_ratings = new_ratings[new_ratings['Book-Title'].isin(top_books) & new_ratings['User-ID'].isin(top_users)]
-book_user_table = filtered_ratings.pivot_table(index='Book-Title', columns='User-ID', values='Book-Rating')
-book_user_table.fillna(0, inplace=True)
-
-pairwise_sim = cosine_similarity(book_user_table)
+    def get_matching_titles(self, book_title: str) -> list[str]:
+        title_words = list(map(normalize, book_title.split()))
+        return (self.top_books[self.top_books.to_series()
+                .apply(lambda x: all(s in normalize(str(x)).split() for s in title_words))]
+                .to_list())
