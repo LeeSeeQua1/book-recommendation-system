@@ -1,11 +1,12 @@
 import re
 
+from typing import Final, Pattern
 import pandas as pd
 import numpy as np
 import string
 from sklearn.metrics.pairwise import cosine_similarity
 
-num_word = {
+num_word: Final[dict[str, str]] = {
     '1': 'one',
     '2': 'two',
     '3': 'three',
@@ -35,7 +36,7 @@ num_word = {
     '90': 'ninety'
 }
 
-roman_arabic = {
+roman_arabic: Final[dict[str, str]] = {
     'i': 'one',
     'ii': 'two',
     'iii': 'three',
@@ -59,7 +60,7 @@ roman_arabic = {
     'xxi': 'twenty one'
 }
 
-ordinal_to_number = {
+ordinal_to_number: Final[dict[str, str]] = {
     'first': 'one',
     'second': 'two',
     'third': 'three',
@@ -92,11 +93,11 @@ ordinal_to_number = {
     'thirtieth': 'thirty'
 }
 
-ordinal_pattern = re.compile(r'(\d+)(st|nd|rd|th)')
-non_alphanum_pattern = re.compile(r'[^a-z0-9\s]')
+ordinal_pattern: Final[Pattern[str]] = re.compile(r'(\d+)(st|nd|rd|th)')
+non_alphanum_pattern: Final[Pattern[str]] = re.compile(r'[^a-z0-9\s]')
 
 
-def is_good_title(title):
+def is_good_title(title: str) -> bool:
     return all(ch.isalpha()
                or ch == ' '
                or ch.isdigit()
@@ -105,18 +106,14 @@ def is_good_title(title):
 
 def normalize(text: str) -> list[str]:
     text = text.lower()
-    # text = text.replace("'s", "")
     text = text.replace("'", "")
     text = re.sub(non_alphanum_pattern, ' ', text)
     text = re.sub(ordinal_pattern, r'\1', text)
-    # text.replace("'s", '')
-    # text = re.sub(apostrophe_pattern, '', text)
     norm_words = []
     for w in text.split():
         norm_words += num_to_word(w)
     norm_words = list(map(lambda s: roman_arabic[s] if s in roman_arabic else s, norm_words))
     norm_words = list(map(lambda s: ordinal_to_number[s] if s in ordinal_to_number else s, norm_words))
-    # print(norm_words)
     return norm_words
 
 
@@ -132,7 +129,8 @@ def num_to_word(s: str) -> list[str]:
 
 class CFModel:
 
-    def __init__(self, books_dataset: pd.DataFrame, users_dataset: pd.DataFrame):
+    def __init__(self, books_dataset: pd.DataFrame, users_dataset: pd.DataFrame) -> None:
+        self.pictures = None
         self.top_users = None
         self.title_dict = None
         self.top_books = None
@@ -142,18 +140,16 @@ class CFModel:
         self.users = users_dataset
 
         self.books.dropna(inplace=True)
-        self.books.drop(columns=['Image-URL-S', 'Image-URL-L'], inplace=True)
+        self.books.drop(columns=['Image-URL-S', 'Image-URL-M'], inplace=True)
         self.books = self.books[self.books['Book-Title'].apply(is_good_title)]
 
     def fit(self, ratings: pd.DataFrame,
             min_book_reviews: int = 50,
-            min_user_ratings: int = 200):
-
+            min_user_ratings: int = 200) -> None:
         new_ratings = ratings.merge(self.books, on='ISBN')
         new_ratings.drop(columns=[
             'Year-Of-Publication',
             'Publisher',
-            'Image-URL-M',
             'Book-Author'],
             inplace=True)
         user_ratings = ratings.groupby('User-ID').size()
@@ -161,8 +157,9 @@ class CFModel:
             avg_rating='mean',
             num_ratings='count'
         )
-
         self.top_books = book_ratings[book_ratings['num_ratings'] > min_book_reviews].index.to_series()
+        books_by_title = self.books.groupby('Book-Title')['Image-URL-L'].first()
+        self.pictures = books_by_title[books_by_title.index.isin(self.top_books)]
         self.top_users = user_ratings[user_ratings > min_user_ratings].index
         filtered_ratings = new_ratings[
             new_ratings['Book-Title'].isin(self.top_books) & new_ratings['User-ID'].isin(self.top_users)]
@@ -183,18 +180,20 @@ class CFModel:
         enum_sim = list(enumerate(self.pairwise_sim[idx]))
         sorted_sim = list(sorted(enum_sim, key=lambda x: x[1], reverse=True))
         neighbors = list(map(lambda x: x[0], sorted_sim[1: num_books + 1]))
-        # similarities = list(map(lambda x: x[1], sorted_sim[1 : num_books + 1]))
         ans = self.book_user_table.index[neighbors]
         return ans.to_list()
-        # return list(zip(ans.to_list(), similarities))
 
     def get_matching_titles(self, book_title: str) -> list[str]:
         title_words = normalize(book_title)
-        # print(title_words)
         processed_words = []
         for w in title_words:
             processed_words += num_to_word(w)
         return [self.title_dict[k] for k in self.title_dict if all(s in k.split() for s in processed_words)]
 
-    def get_top_users(self):
+    def get_top_users(self) -> list[str]:
         return self.top_users.index.to_list()
+
+    def get_pictures(self, titles: list[str]) -> list[str]:
+        pic_series = self.pictures[self.pictures.index.isin(titles)]
+        title_pic_list = list(zip(pic_series.index, pic_series))
+        return list(map(lambda t: t[1], sorted(title_pic_list, key=lambda t: titles.index(t[0]))))
