@@ -10,10 +10,6 @@ users = pd.read_csv(data_path + 'Users.csv')
 model = CFModel(books, users)
 model.fit(ratings)
 
-with open("dump.txt", "w") as f:
-    for k, v in model.title_dict.items():
-        f.write(f"{k}: {v}\n")
-
 titles = {
     'rich dad, poor dad',
     'rich dad poor dad',
