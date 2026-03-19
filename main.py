@@ -3,7 +3,12 @@ from telegram import InputMediaPhoto, Update
 from telegram.ext import Application, MessageHandler, filters, CommandHandler, ContextTypes, ConversationHandler
 from model import CFModel
 import pandas as pd
+import os
 logger = logging.getLogger(__name__)
+from telegram.request import HTTPXRequest
+from dotenv import load_dotenv
+
+load_dotenv()
 
 CHOOSE_TITLE, WAIT_FOR_TITLE = 0, 1
 MAX_TITLES = 10
@@ -138,11 +143,15 @@ async def error(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 def main():
-    token = ""
+    token = os.getenv("BOT_TOKEN")
+    if not token:
+        raise RuntimeError("BOT_TOKEN not set")
 
-    logging.basicConfig(filename='bot.log', level=logging.WARNING)
+    logging.basicConfig(level=logging.WARNING)
 
-    application = Application.builder().token(token).concurrent_updates(False).build()
+
+    request = HTTPXRequest(read_timeout=20, connect_timeout=20)
+    application = Application.builder().token(token).request(request).build()
     application.add_handler(CommandHandler("start", start))
     cancel_handler = CommandHandler("cancel", cancel)
     application.add_handler(ConversationHandler(
