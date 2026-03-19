@@ -1,34 +1,62 @@
-## Book Recommendation Telegram Bot
+# Book Recommendation Telegram Bot
 
-### Overview
+A Telegram bot that recommends books using collaborative filtering.  
+Built with Python, pandas, scikit-learn, and dockerized for easy deployment.
 
-This is a Telegram bot that recommends books based on a 
-collaborative filtering algorithm. When users provide a book title, the bot 
-suggests similar books based on user rating patterns.
+## Features
+- Search books by partial title
+- Collaborative filtering recommendations (cosine similarity)
+- Docker support for local dev & production
 
-### Core components
+## Quick Start
 
-+ **Exploratory data analysis** (EDA.ipynb);
-+ **Telegram Bot Handler** (main.py). Handles user interactions using python-telegram-bot module;
-+ **Recommendation Engine** (model.py). Implements a collaborative filtering
-model using cosine similarity;
-+ **Title matching system** (model.py, title_matching_test.py). Adds flexible matching for
-partial titles.
+### Required Environment Variables
 
-### Setup
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `BOT_TOKEN` | Telegram bot token from @BotFather | `123456:AAHdqTcv...` |
 
-1. Clone the repository
-    
-    ```git clone https://github.com/LeeSeeQua1/book-recommendation-system.git```;
 
-2. Install dependencies 
+### Option A: Run with Docker
+```bash
+# 1. Clone repo & prepare config
+git clone https://github.com/LeeSeeQua1/book-recommendation-system.git
+cd book-recommendation-system
 
-   ```pip install python-telegram-bot pandas scikit-learn numpy```;
-3. Download data, place it to the data folder;
-4. Obtain a bot token from @BotFather in Telegram and add it to the token variable;
-in main
-5. Run the bot by calling
-    ```python main.py```
+# 2. Edit .env with your BOT_TOKEN
+echo "BOT_TOKEN={BOT_TOKEN}" > .env
 
-**Data Source**:
-https://www.kaggle.com/datasets/arashnic/book-recommendation-dataset
+# 3. Build and start
+docker compose build
+docker compose up -d
+
+# 4. View logs
+docker compose logs -f
+```
+
+### Option B: Run Locally
+
+```bash
+# 1. Clone repo
+git clone https://github.com/LeeSeeQua1/book-recommendation-system.git
+cd book-recommendation-system
+
+# 2. Create virtual environment (recommended)
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Edit .env with your BOT_TOKEN
+echo "BOT_TOKEN={BOT_TOKEN}" > .env
+
+# Download data from https://www.kaggle.com/datasets/arashnic/book-recommendation-dataset
+# Place CSV files in ./data/
+
+# 5. Run the bot
+python main.py
+```
+
+## Data source
+[Book Recommendation Dataset](https://www.kaggle.com/datasets/arashnic/book-recommendation-dataset?spm=a2ty_o01.29997173.0.0.507d5171LDVM0s)
